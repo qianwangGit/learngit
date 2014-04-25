@@ -1,2 +1,0 @@
-delete branch dev and build new branch feature1
-create a new branch dev

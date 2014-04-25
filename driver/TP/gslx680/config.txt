@@ -1,0 +1,57 @@
+#"用于平台n326"
+
+						一.将驱动加入内核
+1.添加i2c设备：
+在/kernel/arch/arm/mach-prima2/devices/i2c_dev.c中的struct i2c_board_info sirfsoc_i2c0_client_devices[]中加入：
+#if defined(CONFIG_TOUCHSCREEN_GSLX680) 
+        {
+                I2C_BOARD_INFO("gslX680", 0x40),
+                .irq = IRQ_GPIO1_INTR27,
+        },
+#endif
+
+
+2.将相应的驱动文件拷贝到对应的目录下：
+将samsung_gslx680.c及samsung_gslx680.h拷贝到/kernel/driver/input/touchscreen
+
+
+3.修改Kconfig及Makefile：
+在Kconfig中加入：
+config TOUCHSCREEN_GSLX680
+       tristate "gslx680   touchscreen controller"
+       depends on I2C
+       help
+          Say Y here if you support gslx680 TangoC touchscreen controller
+	  If unsure, Say N.
+在Makefile中加入：
+obj-$(CONFIG_TOUCHSCREEN_GSLX680)       += samsung_gslX680.o
+
+4.运行make kmenuconfig选中驱动生成.config:
+
+		 				  二.修改驱动
+1.修改头文件：
+添加（第一个顺序在下两个前面）
+#include <linux/nwd-config.h>
+#include <mach/nwd-gpio.h>
+#include <mach/gpio.h>
+
+2.修改I2C设备信息：
+name:gslX680
+addr:0x40
+IRQ_NUMBER:IRQ_CTP_INT
+
+3.修改gpio口：
+reset口：gpio_request(GPIO_CTP_RST,"GPIO_CTP_RST");
+       	 gpio_direction_output(GPIO_CTP_RST, 0);
+         gpio_direction_output(GPIO_CTP_RST, 1);
+irq口：  gpio_request(GPIO_CTP_INT,"GPIO_CTP_INT");
+       	 GTP_GPIO_AS_INT(GPIO_CTP_INT);
+
+
+
+
+
+
+
+
+
