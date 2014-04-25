@@ -285,11 +285,74 @@ static void gslx680_chip_init(struct i2c_client *client)
 
 static void record_point(u16 x,u16 y,u8 id)
 {
-	u16 x_e
+	u16 x_err =0;
+	u16 y_err =0;
+
+	id_sign[id]=id_sign[id]+1;
+	
+	if(id_sign[id]==1)
+	{
+		x_old[id]=x;
+		y_old[id]=y;
+	}
+
+	x = (x_old[id] + x)/2;
+	y = (y_old[id] + y)/2;
+		
+	if(x>x_old[id])
+		x_err=x -x_old[id];
+	else
+		x_err=x_old[id]-x;
+
+	if(y>y_old[id])
+		y_err=y -y_old[id];
+	else
+		y_err=y_old[id]-y;
+
+	if( (x_err > 3 && y_err > 1) || (x_err > 1 && y_err > 3) )
+	{
+		x_new = x;     x_old[id] = x;
+		y_new = y;     y_old[id] = y;
+	}
+	else
+	{
+		if(x_err > 3)
+		{
+			x_new = x;     
+			x_old[id] = x;
+		}
+		else
+			x_new = x_old[id];
+		if(y_err> 3)
+		{
+			y_new = y;     
+			y_old[id] = y;
+		}
+		else
+			y_new = y_old[id];
+	}
+
+	if(id_sign[id]==1)
+	{
+		x_new= x_old[id];
+		y_new= y_old[id];
+	}
 }
 
 
-
+static void report_data(struct gsl_ts *ts,u16 x,u16 y,u8 press,u8 id)
+{
+	printk("----------report data---------\n");
+	printk("==========id = %d,x = %d,y = %d==========\n",id,x,y);
+	if(x > SCREEN_MAX_X || y > SCREEN_MAX_Y)
+		return;
+	input_mt_slot(ts->input,id);
+	input_report_abs(ts->input,ABS_MT_TRACKING_ID,id);
+	input_report_abs(ts->input,ABS_MT_POSITION_X,x);
+	input_report_abs(ts->input,ABS_MT_POSITION_Y,y);
+	input_report_abs(ts->input,ABS_MT_PRESSURE,press);
+	input_report_abs(ts->input,BTN_TOUCH,1);
+}
 
 static void gslx680_ts_workfunc(struct work_struct *work)
 {
@@ -305,7 +368,8 @@ static void gslx680_ts_workfunc(struct work_struct *work)
 	if(ret < 0)
 	{
 		printk("in workfunc read data register failed.\n");
-		goto schedu;
+		enable_irq(ts->irq);
+		return;
 	}
 
 	touchs = ts->touch_data[ts->obj_data->touch_index];
@@ -329,13 +393,35 @@ static void gslx680_ts_workfunc(struct work_struct *work)
 			report_data(ts,x_new,y_new,10,id);
 			id_state_flag[id] = 1;
 		}
-
-
-
+	for(i = 1; i <= MAX_CONTACTS; i ++)
+	{	
+		if( (0 == touches) || ((0 != id_state_old_flag[i]) && (0 == id_state_flag[i])) )
+		{
+		#ifdef REPORT_DATA_ANDROID_4_0
+			input_mt_slot(ts->input, i);
+			input_report_abs(ts->input, ABS_MT_TRACKING_ID, -1);
+			input_mt_report_slot_state(ts->input, MT_TOOL_FINGER, false);
+		#endif
+			id_sign[i]=0;
+		}
+		id_state_old_flag[i] = id_state_flag[i];
 	}
-
-
-
+	#ifndef REPORT_DATA_ANDROID_4_0
+	if(0 == touches)
+	{	
+		input_mt_sync(ts->input);
+	#ifdef HAVE_TOUCH_KEY
+		if(key_state_flag)
+		{
+        	input_report_key(ts->input, key, 0);
+			input_sync(ts->input);
+			key_state_flag = 0;
+		}
+	#endif			
+	}
+	#endif
+	input_sync(ts->input);
+	enable_irq(ts->irq);
 }
 
 
