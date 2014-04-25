@@ -1,2 +1,3 @@
 git test build branch
 hello branch dev
+Create new branch feature1,and commit then checkout to master
